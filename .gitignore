@@ -10,3 +10,6 @@ _alpha.png
 # OS / editor
 .DS_Store
 Thumbs.db
+
+# npm pack output
+*.tgz

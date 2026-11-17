@@ -12,11 +12,11 @@
 |---|---|
 | 仓库 | https://github.com/Ronion123/dsh-nexus |
 | npm 包名 | `@ronion123/dsh-nexus`（npm 只允许小写，GitHub 名是 `Ronion123`） |
-| 索引地址 | `https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json` |
-| 版本 tag | `v1.0.0` |
+| 索引地址 | `https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@release-1.0.0/site/index.json` |
+| 版本 tag | `release-1.0.0` |
 
-> 索引地址用**固定 tag**（`@v1.0.0`）而不是 `@main`：内容不会被后续提交意外改变。
-> 发新版本时打新 tag（如 `v1.1.0`），再把索引地址换成新 tag，或始终把最新版写在 `@main` 的索引里。
+> 索引地址用**固定 tag**（`@release-1.0.0`）而不是 `@main`：内容不会被后续提交意外改变。
+> 发新版本时打新 tag（如 `release-1.1.0`），再把索引地址换成新 tag，或始终把最新版写在 `@main` 的索引里。
 
 包名占位符已全部替换完毕，`tools/publish.py --scope/--owner` 仅在需要改名字时再用。
 
@@ -67,7 +67,7 @@ npm view @ronion123/dsh-nexus version
 ### 你的索引地址（已实测 200）
 
 ```
-https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json
+https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@release-1.0.0/site/index.json
 ```
 
 已验证：
@@ -79,7 +79,7 @@ https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json
 
 图标在索引里写的是相对路径 `icons/dsh-nexus.svg`，会按索引 URL 自动解析成上面的绝对地址，验证通过。
 
-**为什么用 `@v1.0.0` 而不是 `@main`**：固定 tag 让索引内容不会被后续提交意外改变。发新版本时打新 tag 并更新地址即可。
+**为什么用 `@release-1.0.0` 而不是 `@main`**：固定 tag 让索引内容不会被后续提交意外改变。发新版本时打新 tag 并更新地址即可。
 
 **为什么不用 GitHub Pages**：你已把 Pages 配到根目录，方案 B 不依赖它，不影响使用；想关掉可在 Settings → Pages → Source 选 `None`。
 

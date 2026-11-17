@@ -1,0 +1,50 @@
+{
+  "name": "@PLACEHOLDER/dsh-nexus",
+  "version": "1.0.0",
+  "description": "奈克赛斯桌宠：由 Q 版英雄循环动画、九格动作组与五张透明姿势立绘组成的 dsh-pet 种类包。",
+  "type": "module",
+  "icon": "icon.svg",
+  "license": "MIT",
+  "author": "Ronin",
+  "homepage": "https://github.com/PLACEHOLDER/dsh-nexus#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PLACEHOLDER/dsh-nexus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PLACEHOLDER/dsh-nexus/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "locale",
+    "docs",
+    "icon.svg",
+    "LICENSE",
+    "README.md",
+    "CHANGELOG.md",
+    "pet-pack"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "dsh-pet",
+    "pet-pack",
+    "nexus",
+    "桌宠"
+  ]
+}

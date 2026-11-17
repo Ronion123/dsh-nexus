@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Nexus pet",
+    "description": "Adds the chibi Ultraman 'Nexus' as a dsh-pet character pack, built from transparent artwork you supplied: a 12-frame idle loop animation, a nine-pose action sheet, and five high-resolution pose illustrations. Requires the dsh-pet plugin to be installed and enabled. At boot this bundle copies a pet pack (config, 35 VP9-alpha animations, five pose stickers, avatar and character sheet) into dsh-pet's user data folder; dsh-pet renders it with drag-and-throw physics, a right-click action menu listing the nine combos and five forms, work-status animations driven by session events, whispers in the character's own voice, chat, balance and sleeping. After installation, refresh the Web page or use the desktop pet's 'Reload config' menu item to show the new character. Enabling or disabling this bundle does not delete the installed pack.",
+    "detail": "docs/DETAIL.md"
+  }
+}

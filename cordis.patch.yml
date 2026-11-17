@@ -1,0 +1,7 @@
+# dsh-nexus bundle patch.
+# The Host half installs the pet pack into dsh-pet's user data root at boot.
+# It declares no services of its own: dsh-pet (installed and enabled) owns
+# rendering, menus, physics, chat and session-event linkage.
+- insert:
+    - id: dsh-nexus
+      name: 'dsh-nexus'

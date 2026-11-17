@@ -1,0 +1,85 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Ronin's DSH pets",
+    "zh": "Ronin 的 DSH 桌宠"
+  },
+  "description": {
+    "en": "Character packs for the DeepSeek Harness desktop pet.",
+    "zh": "DeepSeek Harness 桌宠角色包。"
+  },
+  "metadata": {
+    "categories": {
+      "pet": {
+        "title": {
+          "en": "Desktop pets",
+          "zh": "桌宠"
+        }
+      }
+    },
+    "labels": {
+      "open-source": {
+        "title": {
+          "en": "Open source",
+          "zh": "开源"
+        }
+      },
+      "chinese": {
+        "title": {
+          "en": "Chinese UI",
+          "zh": "中文界面"
+        }
+      }
+    },
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "@PLACEHOLDER/dsh-nexus",
+      "title": {
+        "en": "Nexus pet",
+        "zh": "奈克赛斯桌宠"
+      },
+      "description": {
+        "en": "A chibi Ultraman Nexus desktop pet for dsh-pet, built from a 12-frame transparent loop animation, a nine-pose action sheet, and five pose illustrations. Installs as a dsh-pet character pack; requires dsh-pet to be enabled.",
+        "zh": "Q 版奥特战士奈克赛斯桌宠，由 12 帧透明循环动画、九格动作组与五张姿势立绘组成。作为 dsh-pet 种类包安装，需要先启用 dsh-pet。"
+      },
+      "icon": "icons/dsh-nexus.svg",
+      "author": "Ronin",
+      "homepage": "https://github.com/PLACEHOLDER/dsh-nexus#readme",
+      "repository": {
+        "url": "https://github.com/PLACEHOLDER/dsh-nexus"
+      },
+      "metadata": {
+        "category": "pet",
+        "keywords": [
+          "dsh",
+          "dsh-plugin",
+          "deepseek-harness",
+          "desktop-pet",
+          "dsh-pet",
+          "pet-pack",
+          "nexus",
+          "桌宠"
+        ],
+        "labels": [
+          "open-source",
+          "chinese"
+        ],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "publishTimestamp": 1794914246,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}

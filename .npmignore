@@ -1,0 +1,12 @@
+# Folders that are build intermediates, not sources.
+assets/
+
+# Local tooling noise
+node_modules/
+_frames/
+_alpha.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

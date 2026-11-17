@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Republish so the README shown on npmjs.com carries the v1.0.1 index URL
+  (1.0.1 was packed before that tag existed).
+- No runtime changes.
+
 ## 1.0.1
 
 - Fix the index URL shipped in the published README: point at

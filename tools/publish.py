@@ -28,7 +28,7 @@ PLACEHOLDER = "PLACEHOLDER"
 # Live publication facts for this repository. The index URL pins a tag so its
 # contents never change under users' feet; bump TAG when publishing a release.
 REPO = "https://github.com/Ronion123/dsh-nexus"
-TAG = "v1.0.1"
+TAG = "v1.1.0"
 INDEX_URL = "https://raw.githubusercontent.com/Ronion123/dsh-nexus/%s/site/index.json" % TAG
 
 # Files that carry the two placeholders.

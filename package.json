@@ -1,6 +1,6 @@
 {
   "name": "@roninxr/dsh-nexus",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "奈克赛斯桌宠：由 Q 版英雄循环动画、九格动作组与五张透明姿势立绘组成的 dsh-pet 种类包。",
   "type": "module",
   "icon": "icon.svg",
@@ -19,10 +19,12 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": "./client.js"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "locale",
     "docs",
@@ -35,6 +37,10 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
     }
   },
   "keywords": [

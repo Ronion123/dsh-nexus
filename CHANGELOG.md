@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.0
+
+- Click sound is now the character's war cry instead of dsh-pet's stock
+  duck quack. dsh-pet codes that URL as a client constant and its /sound
+  route serves only the package directory, and DSH's webServer rejects a
+  duplicate route registration, so the Host half swaps the package wav at
+  boot (backing the original up once) and re-applies it after any dsh-pet
+  reinstall.
+- Dragging, throwing and ceiling bounces all use the flight pose, and the
+  sprite points the way the cursor moves: a leftward drag shows the
+  left-facing flight clip, a rightward drag the right-facing one. New
+  `client.js` half watches pointer motion and drives `facing` through
+  `/anim`, which previously stayed at whatever the pet last faced.
+- Two new directional flight clips (36 total).
+
 ## 1.0.2
 
 - Republish so the README shown on npmjs.com carries the v1.0.1 index URL

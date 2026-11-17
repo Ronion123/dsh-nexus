@@ -94,7 +94,7 @@ print("pet-pack: %d webm, %d memes, avatar=%s, character=%s" % (
     n_webm, n_png,
     os.path.isfile(os.path.join(PACK, "config", "nexus-avatar.png")),
     os.path.isfile(os.path.join(PACK, "config", "nexus-character.png"))))
-if n_webm != 35:
+if n_webm != 36:
     errors.append("unexpected webm count: %d" % n_webm)
 if n_png != 5:
     errors.append("unexpected meme count: %d" % n_png)

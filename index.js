@@ -124,18 +124,83 @@ function installPetPack() {
   return summary;
 }
 
+/**
+ * Replace dsh-pet's built-in click sound with this pack's war cry.
+ *
+ * Why this is a file replacement rather than a pet-pack feature: dsh-pet codes
+ * the sound URL as a constant on the client and its `/sound` route serves only
+ * the package directory ("no user-directory override"), and DSH's webServer
+ * rejects duplicate route registrations, so a plugin cannot shadow that route.
+ * We therefore swap the package file itself, which is the only supported channel.
+ *
+ * Idempotent and self-healing: the original is backed up once, and every Host
+ * boot re-applies the wav if a dsh-pet reinstall/upgrade restored the original.
+ */
+function installClickSound() {
+  const summary = { ok: true, applied: false, reason: undefined };
+  const wavSrc = join(PACK_DATA_DIR, 'sound', 'click-duck.wav');
+  if (!existsSync(wavSrc)) {
+    summary.ok = false;
+    summary.reason = 'bundled wav missing';
+    return summary;
+  }
+
+  // Locate the installed dsh-pet package from this plugin's own node_modules
+  // (both live under the same profile), then fall back to the profile root.
+  const candidates = [
+    join(PACKAGE_DIR, '..', 'dsh-pet'),
+    process.env.DSH_PROFILE_DIR ? join(process.env.DSH_PROFILE_DIR, 'node_modules', 'dsh-pet') : '',
+  ].filter((p) => p !== '');
+
+  let target;
+  for (const dir of candidates) {
+    const soundDir = resolve(dir, 'assets', 'sound');
+    if (existsSync(soundDir)) {
+      target = join(soundDir, 'click-duck.wav');
+      break;
+    }
+  }
+  if (!target) {
+    summary.ok = false;
+    summary.reason = 'dsh-pet assets/sound not found';
+    return summary;
+  }
+
+  try {
+    const wav = readFileSync(wavSrc);
+    const backup = target + '.dsh-nexus-original';
+    const currentSame = existsSync(target) && sha256(readFileSync(target)) === sha256(wav);
+    if (currentSame) {
+      summary.applied = true; // already ours
+      return summary;
+    }
+    // Keep the stock file once so the user can restore it.
+    if (!existsSync(backup) && existsSync(target)) writeFileSync(backup, readFileSync(target));
+    writeFileSync(target, wav);
+    summary.applied = true;
+  } catch (error) {
+    summary.ok = false;
+    summary.reason = error instanceof Error ? error.message : String(error);
+  }
+  return summary;
+}
+
 export const inject = [];
 
 export function apply(ctx) {
   const result = installPetPack();
+  const sound = installClickSound();
   try {
     const info = ctx?.logger?.info;
     const warn = ctx?.logger?.warn;
-    if (result.ok) {
-      if (typeof info === 'function') info(`[dsh-nexus] pet pack ready: ${JSON.stringify(result)}`);
-    } else if (typeof warn === 'function') {
-      // Non-fatal: the Host must keep booting even when the user data dir is read-only.
-      warn(`[dsh-nexus] pet pack install failed: ${result.reason}`);
+    if (typeof info === 'function') {
+      if (result.ok) info(`[dsh-nexus] pet pack ready: ${JSON.stringify(result)}`);
+      info(`[dsh-nexus] click sound: ${JSON.stringify(sound)}`);
+    }
+    if (typeof warn === 'function') {
+      // Non-fatal: the Host must keep booting even when a dsh-pet dir is read-only.
+      if (!result.ok) warn(`[dsh-nexus] pet pack install failed: ${result.reason}`);
+      if (!sound.ok) warn(`[dsh-nexus] click sound not applied: ${sound.reason}`);
     }
   } catch {
     // A Host without a usable logger still works; the pack is simply not installed.

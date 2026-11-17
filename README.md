@@ -14,7 +14,7 @@
 2. 出现 **发现** 标签 → **添加索引源**，粘贴：
 
    ```
-   https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.0.1/site/index.json
+   https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.1.0/site/index.json
    ```
 
 3. 找到「奈克赛斯桌宠」→ **安装** → 确认来源 `@roninxr/dsh-nexus@1.0.0`
@@ -62,7 +62,7 @@ dsh plugin --profile <你的 profile> add @roninxr/dsh-nexus
 |---|---|
 | `idle` | 待机-呼吸循环（**原始 12 帧循环动画**） |
 | `turn` | 转向-回身 |
-| `drag` | 拖拽-浮空（飞行姿势） |
+| `drag` | **拖拽-飞行向左 / 拖拽-飞行向右**（方向感知，见下） |
 | `clicks` | 点击-形态闪现 / 点击-光束 / 点击-迎击 |
 | `moves` | 移动-飞行巡航 |
 | `categories` | **九式连招**（起手式、连击式、展开式、横击式、蓄势式、爆发式、回旋式、疾飞式、展翼式，权重 58）<br>**形态**（站立、战斗、必杀光线、飞行、形态切换，权重 24）<br>**光之动作**（权重 8） |
@@ -73,6 +73,34 @@ dsh plugin --profile <你的 profile> add @roninxr/dsh-nexus
 | `animationWeights` | idle 10 / turn 0 / move 0 + 分类 90 = 100 |
 
 右键 →「动作」→「九式连招」可逐个点播九个动作。
+
+---
+
+## 音效与方向（1.1.0 新增）
+
+### 点击音效换成角色战吼
+
+点击桌宠播放的是**战吼**，不再是 dsh-pet 内置的鸭子叫声。
+
+实现上有一个绕不开的限制：dsh-pet 把音效地址写死成客户端常量，它的 `/sound` 路由只读包内目录（源码注释明确写「不做用户目录覆盖」），而 DSH 的 webServer **不允许重复注册同一路径**（会直接抛错），所以插件无法拦截那条路由。
+
+因此 Host 半侧在每次启动时**替换 dsh-pet 包内的 `assets/sound/click-duck.wav`**：
+- 首次运行会把原文件备份成 `click-duck.wav.dsh-nexus-original`
+- 按内容哈希比对，已是我们这份就不重复写
+- **重装 / 升级 dsh-pet 后自动重新应用**，无需手动处理
+
+想恢复原音效：把备份文件改名回 `click-duck.wav` 即可。
+
+### 方向感知的飞行姿势
+
+拖动、抛掷、顶部反弹**统一使用飞行姿势**，并且**朝向跟随鼠标移动方向**：
+
+- 向左拖 → 播 `拖拽-飞行向左`，角色朝左飞
+- 向右拖 → 播 `拖拽-飞行向右`，角色朝右飞
+
+`client.js` 监听宠物元素上的指针移动，按水平位移方向调用 `/anim` 的 `facing` 参数（这是 dsh-pet 官方开放的控制通道）。位移小于 6px 的抖动会被忽略，避免手抖导致贴图闪烁。
+
+两个方向的片段都是 640×360 VP9-alpha：左向为原始飞行图的镜像，右向反之。
 
 ---
 
@@ -90,20 +118,22 @@ dsh plugin --profile <你的 profile> add @roninxr/dsh-nexus
 
 ```
 dsh-nexus/
-├── package.json                dsh.bundle.patch 声明
+├── package.json                dsh.bundle.patch + dsh.client 声明
 ├── cordis.patch.yml            插入一条 Host 插件行
-├── index.js                    Host 半侧：启动时幂等安装种类包
+├── index.js                    Host 半侧：幂等安装种类包 + 替换点击音效
+├── client.js                   浏览器半侧：方向感知飞行（监听指针 → /anim facing）
 ├── icon.svg                    插件图标
 ├── locale/en.json, zh.json     中英文标题与说明
 ├── docs/DETAIL*.md             单图详情页
 ├── docs/preview.svg            自包含预览（五姿势 + 循环帧）
-├── assets/                     中间产物（立绘、循环帧）
+├── assets/                     中间产物（立绘、循环帧、音效源）
 ├── pet-pack/                   安装到 dsh-pet 用户目录的内容
 │   ├── config/nexus-config.json   种类配置（animations 段、人设、文案、pets）
 │   ├── config/nexus-avatar.png    设置页头像
 │   ├── config/nexus-character.png 角色参考图
-│   ├── animation/*.webm           35 段 VP9-alpha 动画
-│   └── memes/*.png                5 张姿势表情包
+│   ├── animation/*.webm           36 段 VP9-alpha 动画
+│   ├── memes/*.png                5 张姿势表情包
+│   └── sound/click-duck.wav       战吼（替换 dsh-pet 内置点击音效）
 └── tools/                      生成与校验脚本（不参与运行时）
 ```
 

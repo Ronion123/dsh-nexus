@@ -125,13 +125,20 @@ function installPetPack() {
 }
 
 /**
- * Locate the installed dsh-pet package from this plugin's own node_modules
- * (both live under the same profile), then fall back to the profile root.
+ * Locate the installed dsh-pet package.
+ *
+ * A scoped install puts this plugin at `<profile>/node_modules/@scope/dsh-nexus`,
+ * so the sibling directory is one level up and then `dsh-pet` — not `..` + name.
+ * Try every plausible anchor and keep the first directory that owns `assets/`.
  */
 function findDshPet() {
   const candidates = [
+    // unscoped: <profile>/node_modules/dsh-nexus -> <profile>/node_modules/dsh-pet
     join(PACKAGE_DIR, '..', 'dsh-pet'),
+    // scoped:   <profile>/node_modules/@scope/dsh-nexus -> .../node_modules/dsh-pet
+    join(PACKAGE_DIR, '..', '..', 'dsh-pet'),
     process.env.DSH_PROFILE_DIR ? join(process.env.DSH_PROFILE_DIR, 'node_modules', 'dsh-pet') : '',
+    process.env.DSH_PROFILE_DIR ? join(process.env.DSH_PROFILE_DIR, 'node_modules', '@deepseek-ai', 'dsh-pet') : '',
   ].filter((p) => p !== '');
   for (const dir of candidates) {
     if (existsSync(join(dir, 'assets'))) return dir;
@@ -140,103 +147,86 @@ function findDshPet() {
 }
 
 /**
- * Replace dsh-pet's built-in click sound with this pack's war cry.
+ * Install this character's icons.
  *
- * Why this is a file replacement rather than a pet-pack feature: dsh-pet codes
- * the sound URL as a constant on the client and its `/sound` route serves only
- * the package directory ("no user-directory override"), and DSH's webServer
- * rejects duplicate route registrations, so a plugin cannot shadow that route.
- * We therefore swap the package file itself, which is the only supported channel.
+ * dsh-pet 0.4.9 gives these two asset families different override rules, and the
+ * difference decides whether an icon survives a dsh-pet upgrade:
  *
- * Idempotent and self-healing: the original is backed up once, and every Host
- * boot re-applies the wav if a dsh-pet reinstall/upgrade restored the original.
+ *   /pic/<file>  -> `$DSH_HOME/dsh-pet/pic/` wins over the package directory,
+ *                   explicitly so custom icons outlive a plugin upgrade.
+ *                   Notification icons therefore go there and are never written
+ *                   into the dsh-pet package.
+ *
+ *   /logo, /sound -> package directory only (no user-layer lookup), and the
+ *                   Electron helper reads `assets/logo.png` straight off disk for
+ *                   the tray badge and window icon. Those two files must be
+ *                   replaced in the package, backed up once and re-applied on
+ *                   every boot so a reinstall cannot silently revert them.
  */
-function installClickSound(dshPet) {
-  const summary = { ok: true, applied: false, reason: undefined };
-  const wavSrc = join(PACK_DATA_DIR, 'sound', 'click-duck.wav');
-  if (!existsSync(wavSrc)) {
-    summary.ok = false;
-    summary.reason = 'bundled wav missing';
-    return summary;
-  }
-
-  const target = dshPet ? join(dshPet, 'assets', 'sound', 'click-duck.wav') : null;
-  if (!target || !existsSync(dirname(target))) {
-    summary.ok = false;
-    summary.reason = 'dsh-pet assets/sound not found';
-    return summary;
-  }
-
-  try {
-    const wav = readFileSync(wavSrc);
-    const backup = target + '.dsh-nexus-original';
-    const currentSame = existsSync(target) && sha256(readFileSync(target)) === sha256(wav);
-    if (currentSame) {
-      summary.applied = true; // already ours
-      return summary;
-    }
-    // Keep the stock file once so the user can restore it.
-    if (!existsSync(backup) && existsSync(target)) writeFileSync(backup, readFileSync(target));
-    writeFileSync(target, wav);
-    summary.applied = true;
-  } catch (error) {
-    summary.ok = false;
-    summary.reason = error instanceof Error ? error.message : String(error);
-  }
-  return summary;
-}
-
-/**
- * Replace dsh-pet's shared artwork with this character's icons.
- *
- * Three seats all read package files that dsh-pet serves without any user-dir
- * override, so a pet pack cannot supply them:
- *   assets/logo.png          /logo  -> settings avatar, tray badge, window and
- *                                     taskbar icon (taskbar/window read the file
- *                                     directly in the Electron helper)
- *   assets/pic/notify-*.png  /pic/* -> system notification icons
- *
- * Same idempotent, self-healing contract as the click sound: back up once, then
- * re-apply on every boot so a dsh-pet reinstall cannot silently revert them.
- */
-const BRAND_FILES = [
-  ['logo.png', ['assets', 'logo.png']],
-  ['notify-done.png', ['assets', 'pic', 'notify-done.png']],
-  ['notify-error.png', ['assets', 'pic', 'notify-error.png']],
-  ['notify-truncated.png', ['assets', 'pic', 'notify-truncated.png']],
-  ['notify-approval.png', ['assets', 'pic', 'notify-approval.png']],
-  ['notify-question.png', ['assets', 'pic', 'notify-question.png']],
-  ['notify-test.png', ['assets', 'pic', 'notify-test.png']],
+const NOTIFY_ICONS = [
+  'notify-done.png',
+  'notify-error.png',
+  'notify-truncated.png',
+  'notify-approval.png',
+  'notify-question.png',
+  'notify-test.png',
 ];
 
-function installBranding(dshPet) {
-  const summary = { ok: true, applied: 0, failed: [] };
-  if (!dshPet) {
-    summary.ok = false;
-    summary.failed.push('dsh-pet not found');
-    return summary;
+/** Files inside the dsh-pet package that must be swapped (no user-layer option). */
+const PACKAGE_ASSETS = [
+  ['logo.png', ['assets', 'logo.png']],
+  ['click-duck.wav', ['assets', 'sound', 'click-duck.wav']],
+];
+
+/** Copy `bytes` onto `target` once, keeping the original beside it. */
+function swapFile(target, bytes, summary, label) {
+  try {
+    if (existsSync(target) && sha256(readFileSync(target)) === sha256(bytes)) {
+      summary.applied += 1; // already ours
+      return;
+    }
+    const backup = target + '.dsh-nexus-original';
+    if (!existsSync(backup) && existsSync(target)) writeFileSync(backup, readFileSync(target));
+    writeFileSync(target, bytes);
+    summary.applied += 1;
+  } catch (error) {
+    summary.failed.push(label + ': ' + (error instanceof Error ? error.message : String(error)));
   }
-  for (const [srcName, relParts] of BRAND_FILES) {
-    const src = join(PACK_DATA_DIR, 'icon', srcName);
-    const target = join(dshPet, ...relParts);
+}
+
+function installBranding(dshPet, userRoot) {
+  const summary = { ok: true, applied: 0, failed: [] };
+
+  // --- notification icons: user layer, survives dsh-pet upgrades ------------
+  const picDir = join(userRoot, 'pic');
+  try {
+    mkdirSync(picDir, { recursive: true });
+  } catch (error) {
+    summary.failed.push('pic dir: ' + (error instanceof Error ? error.message : String(error)));
+  }
+  for (const name of NOTIFY_ICONS) {
+    const src = join(PACK_DATA_DIR, 'icon', name);
     if (!existsSync(src)) {
-      summary.failed.push(srcName + ': bundled file missing');
+      summary.failed.push(name + ': bundled file missing');
       continue;
     }
-    try {
-      const bytes = readFileSync(src);
-      if (existsSync(target) && sha256(readFileSync(target)) === sha256(bytes)) {
-        summary.applied += 1; // already ours
+    swapFile(join(picDir, name), readFileSync(src), summary, name);
+  }
+
+  // --- logo + click sound: package layer only -------------------------------
+  if (!dshPet) {
+    summary.failed.push('dsh-pet package not found (logo/sound not applied)');
+  } else {
+    for (const [srcName, relParts] of PACKAGE_ASSETS) {
+      const src = join(PACK_DATA_DIR, srcName === 'click-duck.wav' ? 'sound' : 'icon', srcName);
+      if (!existsSync(src)) {
+        summary.failed.push(srcName + ': bundled file missing');
         continue;
       }
-      const backup = target + '.dsh-nexus-original';
-      if (!existsSync(backup) && existsSync(target)) writeFileSync(backup, readFileSync(target));
-      writeFileSync(target, bytes);
-      summary.applied += 1;
-    } catch (error) {
-      summary.failed.push(srcName + ': ' + (error instanceof Error ? error.message : String(error)));
+      swapFile(join(dshPet, ...relParts), readFileSync(src), summary, srcName);
     }
   }
+
   if (summary.failed.length > 0) summary.ok = false;
   return summary;
 }
@@ -387,28 +377,28 @@ function applyAll(ctx) {
   const userRoot = join(resolveDshHome(), 'dsh-pet');
   const maid = hideBundledMaid(userRoot);
   const dshPet = findDshPet();
-  const sound = installClickSound(dshPet);
-  const branding = installBranding(dshPet);
+  // Branding covers both layers: notification icons in the user directory, and
+  // the logo + click sound inside the package (dsh-pet offers no user-layer
+  // override for those two, and the Electron helper reads the logo off disk).
+  const branding = installBranding(dshPet, userRoot);
   try {
     const info = ctx?.logger?.info;
     const warn = ctx?.logger?.warn;
     if (typeof info === 'function') {
       if (result.ok) info(`[dsh-nexus] pet pack ready: ${JSON.stringify(result)}`);
       info(`[dsh-nexus] bundled maid hidden: ${JSON.stringify(maid)}`);
-      info(`[dsh-nexus] click sound: ${JSON.stringify(sound)}`);
       info(`[dsh-nexus] branding: ${JSON.stringify(branding)}`);
     }
     if (typeof warn === 'function') {
       // Non-fatal: the Host must keep booting even when a dsh-pet dir is read-only.
       if (!result.ok) warn(`[dsh-nexus] pet pack install failed: ${result.reason}`);
       if (!maid.ok) warn(`[dsh-nexus] could not hide the bundled maid: ${maid.reason}`);
-      if (!sound.ok) warn(`[dsh-nexus] click sound not applied: ${sound.reason}`);
       if (!branding.ok) warn(`[dsh-nexus] branding incomplete: ${branding.failed.join('; ')}`);
     }
   } catch {
     // A Host without a usable logger still works; the pack is simply not installed.
   }
-  return { result, maid, sound, branding };
+  return { result, maid, branding };
 }
 
 export function apply(ctx) {

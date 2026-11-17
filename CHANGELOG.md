@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.3.0
+
+- Notification icons now go into dsh-pet's user layer (`$DSH_HOME/dsh-pet/pic/`)
+  instead of being written into the dsh-pet package. dsh-pet 0.4.9 reads that
+  directory before its bundled assets specifically so custom icons survive a
+  plugin upgrade, so reinstalling or upgrading dsh-pet no longer reverts them.
+  Only `assets/logo.png` (tray badge and window icon, which the Electron helper
+  reads straight off disk) and `assets/sound/click-duck.wav` still need the
+  package swap, and those are re-applied on every boot.
+- Fix `findDshPet()` for scoped installs: a package at
+  `node_modules/@scope/dsh-nexus` has `dsh-pet` two levels up, not one, so the
+  lookup silently failed and no branding was applied on a normal npm install.
+
 ## 1.2.2
 
 - Effects now also run on `app-boot/config-reload`, not only when the plugin

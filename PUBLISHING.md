@@ -11,7 +11,7 @@
 | 项目 | 值 |
 |---|---|
 | 仓库 | https://github.com/Ronion123/dsh-nexus |
-| npm 包名 | `@ronion123/dsh-nexus`（npm 只允许小写，GitHub 名是 `Ronion123`） |
+| npm 包名 | `@roninxr/dsh-nexus`（npm 只允许小写，GitHub 名是 `Ronion123`） |
 | 索引地址 | `https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@release-1.0.0/site/index.json` |
 | 版本 tag | `release-1.0.0` |
 
@@ -52,7 +52,7 @@ npm publish --access public    # scoped 包首次发布必须带 --access public
 发布成功后验证：
 
 ```bash
-npm view @ronion123/dsh-nexus version
+npm view @roninxr/dsh-nexus version
 ```
 
 > `.npmignore` 已排除 `assets/`，包里只含运行时必需的 `pet-pack/`、`index.js`、`locale`、`docs`、图标、LICENSE。

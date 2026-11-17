@@ -35,7 +35,7 @@
   },
   "plugins": [
     {
-      "name": "@ronion123/dsh-nexus",
+      "name": "@roninxr/dsh-nexus",
       "title": {
         "en": "Nexus pet",
         "zh": "奈克赛斯桌宠"

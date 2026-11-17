@@ -17,12 +17,12 @@
    https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@release-1.0.0/site/index.json
    ```
 
-3. 找到「奈克赛斯桌宠」→ **安装** → 确认来源 `@ronion123/dsh-nexus@1.0.0`
+3. 找到「奈克赛斯桌宠」→ **安装** → 确认来源 `@roninxr/dsh-nexus@1.0.0`
 
 **方式二：直接安装 npm 包**
 
 ```bash
-dsh plugin --profile <你的 profile> add @ronion123/dsh-nexus
+dsh plugin --profile <你的 profile> add @roninxr/dsh-nexus
 ```
 
 **方式三：从本地目录安装**（开发调试）

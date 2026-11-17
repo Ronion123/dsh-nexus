@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- Rebrand every icon seat that dsh-pet serves from its own package, which a
+  pet pack cannot supply: the plugin logo (settings avatar, tray badge,
+  window and taskbar icon) plus all six system-notification icons. The Host
+  half backs the originals up once and re-applies on every boot, so a
+  dsh-pet reinstall cannot silently revert them.
+- The bundled 'blue maid' pet is hidden (display=none) so only Nexus shows.
+  The entry is kept because dsh-pet falls back to its built-in defaults and
+  would bring the maid back if `main` were deleted.
+
 ## 1.1.0
 
 - Click sound is now the character's war cry instead of dsh-pet's stock

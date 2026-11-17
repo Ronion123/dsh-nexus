@@ -6,31 +6,23 @@
 
 ---
 
-## 0. 先做的一个决定：包名
+## 0. 已确定的发布信息
 
-`dsh-nexus` 这个 npm 包名**已被他人占用**（别人的「Nexus 个人编码助手」v0.2.62），无法直接发布。
+| 项目 | 值 |
+|---|---|
+| 仓库 | https://github.com/Ronion123/dsh-nexus |
+| npm 包名 | `@ronion123/dsh-nexus`（npm 只允许小写，GitHub 名是 `Ronion123`） |
+| 索引地址 | `https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json` |
+| 版本 tag | `v1.0.0` |
 
-因此采用 **scoped 包名**：`@<你的npm用户名>/dsh-nexus`。插件在 DSH 里显示的名字仍然是「奈克赛斯桌宠 / Nexus pet」，用户无感知。
+> 索引地址用**固定 tag**（`@v1.0.0`）而不是 `@main`：内容不会被后续提交意外改变。
+> 发新版本时打新 tag（如 `v1.1.0`），再把索引地址换成新 tag，或始终把最新版写在 `@main` 的索引里。
 
-把两个占位符换成你的名字（只需一条命令）：
-
-```bash
-cd dsh-nexus
-python tools/publish.py --scope 你的npm用户名 --owner 你的GitHub用户名
-```
-
-同名时传两次一样的值即可。脚本会：
-1. 替换 `package.json` / `README.md` / `locale/*.json` 里的 `PLACEHOLDER`
-2. 跑 bundle 与 pack 校验
-3. `npm pack --dry-run` 确认实际会打包的文件（防止漏素材）
-4. 生成 `site/index.json` 索引 + `site/icons/` 图标
-5. 用 DSH 官方校验器 `parseMarketIndex` 验证索引
-
-只想检查、不改动：`python tools/publish.py --check`
+包名占位符已全部替换完毕，`tools/publish.py --scope/--owner` 仅在需要改名字时再用。
 
 ---
 
-## 1. 开源到 GitHub
+## 1. 开源到 GitHub（已完成）
 
 ```bash
 cd dsh-nexus
@@ -60,49 +52,46 @@ npm publish --access public    # scoped 包首次发布必须带 --access public
 发布成功后验证：
 
 ```bash
-npm view @<你的名字>/dsh-nexus version
+npm view @ronion123/dsh-nexus version
 ```
 
 > `.npmignore` 已排除 `assets/`，包里只含运行时必需的 `pet-pack/`、`index.js`、`locale`、`docs`、图标、LICENSE。
+> 实测打包结果：**56 个文件 / 2.59 MB**，35 段动画全部在内。
 
 ---
 
-## 3. 发布市场索引
+## 3. 发布市场索引（已选定方案 B：jsDelivr）
 
-索引就是 `site/` 目录：`index.json` + `icons/dsh-nexus.svg`。放在**任意静态托管**即可，关键是：
+索引就是仓库里的 `site/` 目录：`index.json` + `icons/dsh-nexus.svg`，**无需任何额外部署**——jsDelivr 直接读 GitHub 仓库文件。
 
-- 必须 UTF-8 JSON、2xx 状态、**不能有重定向**（DSH 拒绝跟随重定向）
-- 图标用相对路径 `icons/dsh-nexus.svg`，会按索引 URL 解析
-
-### 方案 A：GitHub Pages（推荐，免费）
-
-```bash
-# 把 site/ 作为 Pages 根目录
-git subtree push --prefix site origin gh-pages
-```
-
-然后在仓库 **Settings → Pages** 选择 `gh-pages` 分支。索引地址就是：
+### 你的索引地址（已实测 200）
 
 ```
-https://<你的名字>.github.io/dsh-nexus/index.json
+https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json
 ```
 
-> GitHub Pages 有时会有重定向；若「添加索引源」报错，改用 jsDelivr 直链：
-> `https://cdn.jsdelivr.net/gh/<你的名字>/dsh-nexus@main/site/index.json`
+已验证：
 
-### 方案 B：npm 分发索引（最稳、最快）
+| 资源 | 结果 |
+|---|---|
+| `site/index.json` | 200, `application/json` |
+| `site/icons/dsh-nexus.svg` | 200, `image/svg+xml` |
 
-把 `site/` 也做成一个 npm 包（如 `@<你的名字>/dsh-nexus-index`），索引地址用 jsDelivr：
+图标在索引里写的是相对路径 `icons/dsh-nexus.svg`，会按索引 URL 自动解析成上面的绝对地址，验证通过。
 
-```
-https://cdn.jsdelivr.net/npm/@<你的名字>/dsh-nexus-index/index.json
-```
+**为什么用 `@v1.0.0` 而不是 `@main`**：固定 tag 让索引内容不会被后续提交意外改变。发新版本时打新 tag 并更新地址即可。
 
-jsDelivr 全球 CDN，实测国内也快，且不会超 DSH 的 15 秒抓取时限。
+**为什么不用 GitHub Pages**：你已把 Pages 配到根目录，方案 B 不依赖它，不影响使用；想关掉可在 Settings → Pages → Source 选 `None`。
 
-### 方案 C：任意对象存储 / 自己的域名
+索引文件的硬性要求（万一你换托管）：
 
-把 `site/` 上传到 OSS / S3 / Cloudflare R2，公网直链即可。**必须 https**（除非只在本地网络用）。
+- UTF-8 JSON、2xx 状态、**不能有重定向**（DSH 拒绝跟随重定向）
+- 相对图标路径按索引 URL 解析
+
+### 备选托管方式
+
+- **GitHub Pages**：`Settings → Pages` 选 `main` + `/docs` 目录（需先把 `site/` 内容复制到 `docs/`）
+- **对象存储**：把 `site/` 上传到 OSS / S3 / Cloudflare R2，公网 https 直链
 
 ---
 

@@ -6,6 +6,31 @@
 
 > 前置条件：已安装并启用 `dsh-pet`。本插件不修改 dsh-pet 包体，也不修改用户主配置 `main-config.jsonc`。
 
+## 安装
+
+**方式一：从插件市场索引安装（推荐）**
+
+1. **插件** 页 → 展开 **实验性插件** → 打开 **自定义插件市场**
+2. 出现 **发现** 标签 → **添加索引源**，粘贴：
+
+   ```
+   https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json
+   ```
+
+3. 找到「奈克赛斯桌宠」→ **安装** → 确认来源 `@ronion123/dsh-nexus@1.0.0`
+
+**方式二：直接安装 npm 包**
+
+```bash
+dsh plugin --profile <你的 profile> add @ronion123/dsh-nexus
+```
+
+**方式三：从本地目录安装**（开发调试）
+
+用 Plugin Manager 的 **Add plugin** 选择本仓库目录。
+
+安装后：网页刷新即可；桌面端右键桌宠 →「重载配置」。
+
 ---
 
 ## 素材来源

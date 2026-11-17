@@ -25,6 +25,12 @@ BUNDLE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = os.path.join(BUNDLE, "publish.config.json")
 PLACEHOLDER = "PLACEHOLDER"
 
+# Live publication facts for this repository. The index URL pins a tag so its
+# contents never change under users' feet; bump TAG when publishing a release.
+REPO = "https://github.com/Ronion123/dsh-nexus"
+TAG = "v1.0.0"
+INDEX_URL = "https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@%s/site/index.json" % TAG
+
 # Files that carry the two placeholders.
 TEXT_FILES = [
     "package.json",
@@ -319,10 +325,10 @@ def main():
     print("  cd " + BUNDLE)
     print("  npm login")
     print("  npm publish --access public")
-    print("  git init && git add . && git commit -m 'feat: Nexus desktop pet'")
-    print("  git remote add origin https://github.com/%s/dsh-nexus.git" % owner)
-    print("  git push -u origin main")
-    print("  -> publish site/index.json + site/icons/ (e.g. GitHub Pages)")
+    print("  git add . && git commit -m 'chore: release' && git push")
+    print("  git tag -a %s -m 'release' && git push origin %s" % (TAG, TAG))
+    print("\nIndex URL (pin a tag; bump TAG in this script for the next release):")
+    print("  " + INDEX_URL)
     return 0
 
 

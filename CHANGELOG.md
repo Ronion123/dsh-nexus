@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1
+
+- Fix the index URL shipped in the published README: point at
+  raw.githubusercontent (200, no redirect) instead of the stale jsDelivr URL,
+  and correct the npm scope shown in install instructions.
+- No runtime changes; the pet pack and Host half are byte-identical to 1.0.0.
+
 ## 1.0.0 — first release
 
 - Ships the Nexus desktop pet as a dsh-pet character pack.

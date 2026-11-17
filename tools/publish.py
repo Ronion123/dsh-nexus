@@ -29,7 +29,7 @@ PLACEHOLDER = "PLACEHOLDER"
 # contents never change under users' feet; bump TAG when publishing a release.
 REPO = "https://github.com/Ronion123/dsh-nexus"
 TAG = "v1.0.0"
-INDEX_URL = "https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@%s/site/index.json" % TAG
+INDEX_URL = "https://raw.githubusercontent.com/Ronion123/dsh-nexus/%s/site/index.json" % TAG
 
 # Files that carry the two placeholders.
 TEXT_FILES = [

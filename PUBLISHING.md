@@ -12,7 +12,7 @@
 |---|---|
 | 仓库 | https://github.com/Ronion123/dsh-nexus |
 | npm 包名 | `@roninxr/dsh-nexus`（npm 只允许小写，GitHub 名是 `Ronion123`） |
-| 索引地址 | `https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json` |
+| 索引地址 | `https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.0.0/site/index.json` |
 | 版本 tag | `v1.0.0` |
 
 > 索引地址用**固定 tag**（`@v1.0.0`）而不是 `@main`：内容不会被后续提交意外改变。
@@ -67,7 +67,7 @@ npm view @roninxr/dsh-nexus version
 ### 你的索引地址（已实测 200）
 
 ```
-https://cdn.jsdelivr.net/gh/Ronion123/dsh-nexus@v1.0.0/site/index.json
+https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.0.0/site/index.json
 ```
 
 已验证：

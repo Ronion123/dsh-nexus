@@ -374,7 +374,14 @@ function parseJsonc(text) {
 
 export const inject = [];
 
-export function apply(ctx) {
+/**
+ * Apply every one-shot effect. Safe to call repeatedly: each step compares content
+ * hashes and skips work that is already applied.
+ *
+ * @param {object} [ctx] Host context; only `logger` is used, and only for reporting.
+ * @returns {object} A summary of each step, for logging.
+ */
+function applyAll(ctx) {
   const result = installPetPack();
   // Resolve the dsh-pet data root the same way installPetPack does.
   const userRoot = join(resolveDshHome(), 'dsh-pet');
@@ -401,6 +408,38 @@ export function apply(ctx) {
   } catch {
     // A Host without a usable logger still works; the pack is simply not installed.
   }
-  // One-shot boot-time effect: nothing to dispose.
+  return { result, maid, sound, branding };
+}
+
+export function apply(ctx) {
+  applyAll(ctx);
+
+  // Installing or updating this bundle reconciles the profile without restarting
+  // the process, so a plugin activated that way can mount long after boot — and may
+  // mount while dsh-pet's files have already been served once. Re-apply on every
+  // config reconciliation so a fresh install takes effect immediately instead of
+  // waiting for the next DSH start. `applyAll` is idempotent: a redundant run only
+  // costs a few file hashes.
+  //
+  // Registered through ctx.effect so unloading the plugin removes the listener
+  // (ctx.on returns a disposer, the same contract dsh-pet relies on).
+  try {
+    if (typeof ctx?.on === 'function') {
+      ctx.effect(() => {
+        const off = ctx.on('app-boot/config-reload', () => {
+          try {
+            applyAll(ctx);
+          } catch {
+            // Never let a reconciler listener break the Host.
+          }
+        });
+        return typeof off === 'function' ? off : () => {};
+      }, 'dsh-nexus: reapply on config reload');
+    }
+  } catch {
+    // Older Host without this event: the boot-time run is enough.
+  }
+
+  // All effects are one-shot file writes; nothing else to dispose.
   return () => {};
 }

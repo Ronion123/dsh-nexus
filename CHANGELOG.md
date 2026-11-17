@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2
+
+- Effects now also run on `app-boot/config-reload`, not only when the plugin
+  is first mounted. Installing the bundle activates it without restarting the
+  process, so before this change the war cry, icons and the hidden maid only
+  landed on the next DSH start. Every step is content-hash compared, so a
+  redundant run costs a few file reads. The listener goes through
+  `ctx.effect`, so unloading the plugin removes it.
+
 ## 1.2.1
 
 - Fix: installing this plugin on a machine that had never edited dsh-pet's

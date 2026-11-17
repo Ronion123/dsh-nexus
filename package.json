@@ -1,6 +1,6 @@
 {
   "name": "@roninxr/dsh-nexus",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "奈克赛斯桌宠：由 Q 版英雄循环动画、九格动作组与五张透明姿势立绘组成的 dsh-pet 种类包。",
   "type": "module",
   "icon": "icon.svg",

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.1
+
+- Fix: installing this plugin on a machine that had never edited dsh-pet's
+  config left the bundled blue maid visible, so two pets appeared. The Host
+  half now sets that pet's `display` to `none` itself: it creates a minimal
+  `main-config.jsonc` when none exists, and when one does exist it parses
+  the JSONC, changes only `display`, keeps every other field, and backs the
+  original text up as `main-config.jsonc.dsh-nexus-before-hide` so user
+  comments stay recoverable. `main` is never deleted, because dsh-pet falls
+  back to its built-in defaults (the maid) when that entry is missing.
+
 ## 1.2.0
 
 - Rebrand every icon seat that dsh-pet serves from its own package, which a

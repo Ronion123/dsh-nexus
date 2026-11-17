@@ -241,10 +241,144 @@ function installBranding(dshPet) {
   return summary;
 }
 
+/**
+ * Hide dsh-pet's bundled "blue maid" so only this character shows.
+ *
+ * dsh-pet ships with `pets: [{ id: 'main', name: '蓝毛小女仆', display: 'both' }]`
+ * and, for a user who never edited `main-config.jsonc`, that maid appears
+ * alongside this pack's pet. The pet-pack format has no "hide the default"
+ * switch, so the only lever is the user config's `display` field.
+ *
+ * Two hard constraints shape this function:
+ *  1. `main-config.jsonc` is JSONC: it may hold `//` and block comments the user
+ *     wrote. We therefore edit the parsed value and re-serialise only when the
+ *     parsed shape actually changed, keeping a one-time backup of the original
+ *     text so the user can always get their comments back.
+ *  2. `main` must keep existing. Deleting the entry makes dsh-pet fall back to
+ *     its built-in defaults, which brings the maid back — so we set
+ *     `display: 'none'` instead of removing anything.
+ *
+ * Idempotent: once display is 'none' the file is left untouched on later boots.
+ */
+function hideBundledMaid(userRoot) {
+  const summary = { ok: true, applied: false, reason: undefined };
+  const configPath = join(userRoot, 'main-config.jsonc');
+  const legacyPath = join(userRoot, 'main-config.json');
+  let target = existsSync(configPath) ? configPath : existsSync(legacyPath) ? legacyPath : configPath;
+
+  // No user config at all: the maid would run on dsh-pet's defaults, so write a
+  // minimal one that keeps `main` present but hidden.
+  let current = null;
+  if (existsSync(target)) {
+    try {
+      current = parseJsonc(readFileSync(target, 'utf8'));
+    } catch (error) {
+      summary.ok = false;
+      summary.reason = 'user config unparsable, left untouched: ' +
+        (error instanceof Error ? error.message : String(error));
+      return summary;
+    }
+  }
+  if (!current || typeof current !== 'object') current = {};
+  const pets = Array.isArray(current.pets) ? current.pets : [];
+
+  let main = pets.find((p) => p && p.id === 'main');
+  let dirty = false;
+  if (!main) {
+    // No main entry: dsh-pet synthesises one from its defaults (the maid, shown).
+    main = {
+      id: 'main',
+      name: '（已停用）蓝毛小女仆',
+      size: 462,
+      balanceEnabled: true,
+      whisperEnabled: true,
+      workStatusEnabled: true,
+      fixedEnabled: false,
+      display: 'none',
+      position: { corner: 'top-right', marginX: 24, marginY: 100 },
+    };
+    current.pets = [...pets, main];
+    dirty = true; // the file must be written even though `main` already reads none
+  }
+
+  if (main.display !== 'none') {
+    main.display = 'none';
+    dirty = true;
+  }
+  if (typeof main.name === 'string' && !main.name.startsWith('（已停用）')) {
+    main.name = '（已停用）' + main.name;
+    dirty = true;
+  }
+
+  // Already hidden and present in the file: nothing to write.
+  if (!dirty && existsSync(target)) {
+    summary.applied = true;
+    return summary;
+  }
+
+  try {
+    // Keep the user's original text once, so JSONC comments are recoverable.
+    const backup = target + '.dsh-nexus-before-hide';
+    if (existsSync(target) && !existsSync(backup)) {
+      writeFileSync(backup, readFileSync(target));
+    }
+    writeFileSync(target, JSON.stringify(current, null, 2) + '\n');
+    summary.applied = true;
+  } catch (error) {
+    summary.ok = false;
+    summary.reason = error instanceof Error ? error.message : String(error);
+  }
+  return summary;
+}
+
+/** Minimal JSONC reader: strips // and block comments outside strings. */
+function parseJsonc(text) {
+  let out = '';
+  let i = 0;
+  let inString = false;
+  const n = text.length;
+  while (i < n) {
+    const c = text[i];
+    if (inString) {
+      out += c;
+      if (c === '\\' && i + 1 < n) {
+        out += text[i + 1];
+        i += 2;
+        continue;
+      }
+      if (c === '"') inString = false;
+      i += 1;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (c === '/' && i + 1 < n && text[i + 1] === '/') {
+      while (i < n && text[i] !== '\n') i += 1;
+      continue;
+    }
+    if (c === '/' && i + 1 < n && text[i + 1] === '*') {
+      i += 2;
+      while (i + 1 < n && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+      i += 2;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return JSON.parse(out);
+}
+
 export const inject = [];
 
 export function apply(ctx) {
   const result = installPetPack();
+  // Resolve the dsh-pet data root the same way installPetPack does.
+  const userRoot = join(resolveDshHome(), 'dsh-pet');
+  const maid = hideBundledMaid(userRoot);
   const dshPet = findDshPet();
   const sound = installClickSound(dshPet);
   const branding = installBranding(dshPet);
@@ -253,12 +387,14 @@ export function apply(ctx) {
     const warn = ctx?.logger?.warn;
     if (typeof info === 'function') {
       if (result.ok) info(`[dsh-nexus] pet pack ready: ${JSON.stringify(result)}`);
+      info(`[dsh-nexus] bundled maid hidden: ${JSON.stringify(maid)}`);
       info(`[dsh-nexus] click sound: ${JSON.stringify(sound)}`);
       info(`[dsh-nexus] branding: ${JSON.stringify(branding)}`);
     }
     if (typeof warn === 'function') {
       // Non-fatal: the Host must keep booting even when a dsh-pet dir is read-only.
       if (!result.ok) warn(`[dsh-nexus] pet pack install failed: ${result.reason}`);
+      if (!maid.ok) warn(`[dsh-nexus] could not hide the bundled maid: ${maid.reason}`);
       if (!sound.ok) warn(`[dsh-nexus] click sound not applied: ${sound.reason}`);
       if (!branding.ok) warn(`[dsh-nexus] branding incomplete: ${branding.failed.join('; ')}`);
     }

@@ -35,7 +35,7 @@
   },
   "plugins": [
     {
-      "name": "@PLACEHOLDER/dsh-nexus",
+      "name": "@ronion123/dsh-nexus",
       "title": {
         "en": "Nexus pet",
         "zh": "奈克赛斯桌宠"
@@ -46,9 +46,9 @@
       },
       "icon": "icons/dsh-nexus.svg",
       "author": "Ronin",
-      "homepage": "https://github.com/PLACEHOLDER/dsh-nexus#readme",
+      "homepage": "https://github.com/Ronion123/dsh-nexus#readme",
       "repository": {
-        "url": "https://github.com/PLACEHOLDER/dsh-nexus"
+        "url": "https://github.com/Ronion123/dsh-nexus"
       },
       "metadata": {
         "category": "pet",
@@ -71,7 +71,7 @@
       "versions": [
         {
           "version": "1.0.0",
-          "publishTimestamp": 1794914246,
+          "publishTimestamp": 1794914923,
           "source": {
             "type": "npm"
           },

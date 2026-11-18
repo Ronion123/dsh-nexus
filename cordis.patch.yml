@@ -1,7 +1,16 @@
 # dsh-nexus bundle patch.
+#
+# `name` must be the package's full npm name, including its scope: the loader
+# imports it from the profile root, where only `@roninxr/dsh-nexus` exists. A
+# bare `dsh-nexus` resolves to nothing and the row fails to mount (the plugin
+# installs but never activates).
+#
+# `id` stays the bare `dsh-nexus`: it is only a row key, and keeping it stable
+# preserves existing user overrides that address this row by id.
+#
 # The Host half installs the pet pack into dsh-pet's user data root at boot.
 # It declares no services of its own: dsh-pet (installed and enabled) owns
 # rendering, menus, physics, chat and session-event linkage.
 - insert:
     - id: dsh-nexus
-      name: 'dsh-nexus'
+      name: '@roninxr/dsh-nexus'

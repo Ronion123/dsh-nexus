@@ -33,8 +33,18 @@ for key in ["index.js", "cordis.patch.yml", "locale", "docs", "icon.svg", "pet-p
 patch = open(os.path.join(B, "cordis.patch.yml"), encoding="utf-8").read()
 if not re.search(r"^\s*- id:\s*dsh-nexus\s*$", patch, re.M):
     errors.append("patch entry id missing or has trailing comment")
-if "name: 'dsh-nexus'" not in patch:
+
+# The loader imports `name` as a package spec from the profile root, so it must be
+# the manifest's full package name. A bare name here installs the bundle but the
+# row never mounts — this exact mismatch shipped in 1.3.0.
+expected_name = pkg.get("name", "")
+m = re.search(r"^\s*name:\s*'([^']+)'\s*$", patch, re.M)
+if not m:
     errors.append("patch name missing")
+elif m.group(1) != expected_name:
+    errors.append(
+        "patch name %r must equal package name %r" % (m.group(1), expected_name)
+    )
 
 for loc, detail in [("en.json", "docs/DETAIL.md"), ("zh.json", "docs/DETAIL.zh.md")]:
     d = json.load(open(os.path.join(B, "locale", loc), encoding="utf-8"))

@@ -12,11 +12,11 @@
 |---|---|
 | 仓库 | https://github.com/Ronion123/dsh-nexus |
 | npm 包名 | `@roninxr/dsh-nexus`（npm 只允许小写，GitHub 名是 `Ronion123`） |
-| 索引地址 | `https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.3.0/site/index.json` |
-| 版本 tag | `v1.3.0` |
+| 索引地址 | `https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.3.1/site/index.json` |
+| 版本 tag | `v1.3.1` |
 
-> 索引地址用**固定 tag**（`@v1.3.0`）而不是 `@main`：内容不会被后续提交意外改变。
-> 发新版本时打新 tag（如 `v1.3.0`），再把索引地址换成新 tag，或始终把最新版写在 `@main` 的索引里。
+> 索引地址用**固定 tag**（`@v1.3.1`）而不是 `@main`：内容不会被后续提交意外改变。
+> 发新版本时打新 tag（如 `v1.3.1`），再把索引地址换成新 tag，或始终把最新版写在 `@main` 的索引里。
 
 包名占位符已全部替换完毕，`tools/publish.py --scope/--owner` 仅在需要改名字时再用。
 
@@ -67,7 +67,7 @@ npm view @roninxr/dsh-nexus version
 ### 你的索引地址（已实测 200）
 
 ```
-https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.3.0/site/index.json
+https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.3.1/site/index.json
 ```
 
 已验证：
@@ -79,7 +79,7 @@ https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.3.0/site/index.json
 
 图标在索引里写的是相对路径 `icons/dsh-nexus.svg`，会按索引 URL 自动解析成上面的绝对地址，验证通过。
 
-**为什么用 `@v1.3.0` 而不是 `@main`**：固定 tag 让索引内容不会被后续提交意外改变。发新版本时打新 tag 并更新地址即可。
+**为什么用 `@v1.3.1` 而不是 `@main`**：固定 tag 让索引内容不会被后续提交意外改变。发新版本时打新 tag 并更新地址即可。
 
 **为什么不用 GitHub Pages**：你已把 Pages 配到根目录，方案 B 不依赖它，不影响使用；想关掉可在 Settings → Pages → Source 选 `None`。
 
@@ -117,7 +117,7 @@ https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.3.0/site/index.json
 python tools/publish.py --index-only
 # 3. 发布
 npm publish --access public
-git add . && git commit -m "chore: release v1.3.0" && git push
+git add . && git commit -m "chore: release v1.3.1" && git push
 ```
 
 `site/index.json` 里 `versions` 是数组，可以保留历史版本让用户回退；`publishTimestamp` 用 npm 上该版本的真实发布时间（Unix 秒）。

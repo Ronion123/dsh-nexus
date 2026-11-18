@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.3.1
+
+- Fix the bundle patch: `name` was the bare `dsh-nexus` while the package is
+  `@roninxr/dsh-nexus`. The loader imports `name` from the profile root, so a
+  registry install added the package but the row never mounted
+  (`fiberPhase: null`), and none of the effects ran. It only worked when a
+  stale unscoped `node_modules/dsh-nexus` happened to exist.
+- Stop writing through hard links: dsh-pet's `assets/logo.png` and
+  `assets/sound/click-duck.wav` are normally links into pnpm's
+  content-addressable store, so replacing them in place rewrote the shared
+  blob and changed what every other project installing that dsh-pet version
+  received. The files are now unlinked before the write, leaving the store
+  intact; the original is still backed up beside the file.
+- Read the marker version from `package.json` instead of a hard-coded copy,
+  which had drifted to `2.0.0`.
+- `tools/validate_bundle.py` now checks that the patch name equals the
+  package name, which is what would have caught the 1.3.0 bug.
+
 ## 1.3.0
 
 - Notification icons now go into dsh-pet's user layer (`$DSH_HOME/dsh-pet/pic/`)

@@ -14,7 +14,7 @@
  * the user added.
  */
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -22,7 +22,18 @@ import { homedir } from 'node:os';
 const PACKAGE_DIR = dirname(fileURLToPath(import.meta.url));
 const PACK_DATA_DIR = join(PACKAGE_DIR, 'pet-pack');
 const MARKER_NAME = '.dsh-nexus.json';
-const BUNDLE_VERSION = '2.0.0';
+
+/**
+ * Marker version, read from the manifest so it can never drift from the release
+ * the user actually installed (a hard-coded copy went stale once already).
+ */
+const BUNDLE_VERSION = (() => {
+  try {
+    return String(JSON.parse(readFileSync(join(PACKAGE_DIR, 'package.json'), 'utf8')).version ?? '0.0.0');
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 /** dsh-pet resolves its data root as join(resolveDshHome(), 'dsh-pet'). */
 function resolveDshHome() {
@@ -178,16 +189,49 @@ const PACKAGE_ASSETS = [
   ['click-duck.wav', ['assets', 'sound', 'click-duck.wav']],
 ];
 
-/** Copy `bytes` onto `target` once, keeping the original beside it. */
-function swapFile(target, bytes, summary, label) {
+/**
+ * Copy `bytes` onto `target` once, keeping the original beside it.
+ *
+ * A package file under `node_modules` is normally a hard link into pnpm's
+ * content-addressable store, so writing through it rewrites the shared blob and
+ * silently changes what every other project installing the same version gets.
+ * When the link count shows more than one, drop the link first and write a fresh
+ * file, which leaves the store untouched.
+ */
+export function swapFile(target, bytes, summary, label) {
   try {
-    if (existsSync(target) && sha256(readFileSync(target)) === sha256(bytes)) {
+    const existed = existsSync(target);
+    const current = existed ? readFileSync(target) : null;
+    if (current !== null && sha256(current) === sha256(bytes)) {
       summary.applied += 1; // already ours
       return;
     }
     const backup = target + '.dsh-nexus-original';
-    if (!existsSync(backup) && existsSync(target)) writeFileSync(backup, readFileSync(target));
-    writeFileSync(target, bytes);
+    if (!existsSync(backup) && current !== null) writeFileSync(backup, current);
+
+    if (existed) {
+      let links = 1;
+      try {
+        links = statSync(target).nlink || 1;
+      } catch {
+        // Unreadable metadata: assume a single link and write in place.
+      }
+      if (links > 1) {
+        try {
+          unlinkSync(target);
+        } catch {
+          // Locked (e.g. the running Electron helper holds the logo): fall back
+          // to an in-place write rather than leaving branding unapplied.
+        }
+      }
+    }
+    try {
+      writeFileSync(target, bytes);
+    } catch (error) {
+      // A failed unlink+write must not leave the file missing; restore the backup.
+      if (!existsSync(target) && existsSync(backup)) writeFileSync(target, readFileSync(backup));
+      throw error;
+    }
     summary.applied += 1;
   } catch (error) {
     summary.failed.push(label + ': ' + (error instanceof Error ? error.message : String(error)));

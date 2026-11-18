@@ -455,12 +455,24 @@ const FORM = {
 /** In-flight switch, so a double click cannot start two hand-offs. */
 let switching = false;
 
-/** dsh-pet's HTTP surface is per-install; discover the origin once. */
-async function petsBaseUrl() {
-  // The web GUI and the pet routes share one origin; the Host knows its own port.
-  const port = process.env.DSH_WEB_PORT ?? '';
-  if (port) return `http://127.0.0.1:${port}/dsh-pet-7340`;
-  return 'http://127.0.0.1:3000/dsh-pet-7340';
+/**
+ * Origin of the running Host's HTTP server, discovered once on first use.
+ *
+ * The pet routes live on whatever port the Host bound (a fresh random port each
+ * launch), so this must come from `ctx.webServer.getOrigin()` — never from a guess.
+ * Guessing a port makes every call fail silently and the menu item does nothing.
+ */
+let cachedOrigin = null;
+
+/** @param {object} [ctx] Host context providing `webServer`. */
+async function petsBaseUrl(ctx) {
+  if (cachedOrigin !== null) return cachedOrigin + '/dsh-pet-7340';
+  const webServer = ctx?.webServer ?? (typeof ctx?.get === 'function' ? ctx.get('webServer') : undefined);
+  if (webServer && typeof webServer.getOrigin === 'function') {
+    cachedOrigin = webServer.getOrigin().replace(/\/$/, '');
+    return cachedOrigin + '/dsh-pet-7340';
+  }
+  throw new Error('webServer.getOrigin() unavailable: cannot locate dsh-pet routes');
 }
 
 /** Read the merged config so we can see what is currently displayed. */
@@ -538,11 +550,11 @@ async function setForm(base, form) {
  *
  * @returns {Promise<{ok: boolean, reason?: string, from?: string}>}
  */
-async function transformToBlue() {
+async function transformToBlue(ctx) {
   if (switching) return { ok: false, reason: 'already-switching' };
   switching = true;
   try {
-    const base = await petsBaseUrl();
+    const base = await petsBaseUrl(ctx);
     const cfg = await readConfig(base);
     const current = visibleForm(cfg);
     if (current === 'blue') return { ok: false, reason: 'already-blue' };
@@ -607,43 +619,81 @@ export function apply(ctx) {
       ctx.effect(() => {
         let stopped = false;
         void (async () => {
-          const base = await petsBaseUrl();
+          let base;
+          try {
+            base = await petsBaseUrl(ctx);
+          } catch (error) {
+            // No webServer origin: dsh-pet's routes are unreachable, so there is
+            // nothing to register. Log it rather than failing silently.
+            try {
+              ctx?.logger?.warn?.(
+                `[dsh-nexus] form-change menu unavailable: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            } catch {
+              /* logger unusable */
+            }
+            return;
+          }
           // The label is what the user clicks in 更多 -> dsh-nexus.
           try {
-            await fetch(`${base}/menu/item`, {
+            // dsh-pet's register payload is { owner, labels: string[], target? }.
+            // `labels` is a flat string array (not objects); sending anything else
+            // is answered with invalid-labels and the item never appears in 更多.
+            const reg = await fetch(`${base}/menu/item`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json; charset=utf-8' },
               body: JSON.stringify({
                 owner: 'dsh-nexus',
-                items: [{ label: '变成蓝色青年形态', target: 'both' }],
+                labels: ['变成蓝色青年形态'],
+                target: 'both',
               }),
             });
+            const regBody = await reg.json().catch(() => ({}));
+            if (regBody?.ok === false) {
+              ctx?.logger?.warn?.(
+                `[dsh-nexus] menu item rejected: ${regBody.reason ?? 'unknown'}`,
+              );
+              return;
+            }
           } catch {
             return; // dsh-pet absent: nothing to contribute to
           }
 
+          // dsh-pet delivers a click to whichever `/menu/events` request is parked.
+          // A short fixed interval misses clicks that land between two polls, so
+          // hold the request open instead: the server parks it and answers as soon
+          // as a click arrives (or after its own wait cap).
           const poll = async () => {
-            if (stopped) return;
-            try {
-              const res = await fetch(
-                `${base}/menu/events?owner=dsh-nexus&wait=0`,
-                { cache: 'no-store' },
-              );
-              if (res.ok) {
-                const body = await res.json();
-                for (const event of body?.events ?? []) {
-                  if (event?.label === '变成蓝色青年形态') void transformToBlue();
+            while (!stopped) {
+              try {
+                const res = await fetch(
+                  `${base}/menu/events?owner=dsh-nexus&wait=10000`,
+                  { cache: 'no-store' },
+                );
+                if (!res.ok) {
+                  await new Promise((r) => setTimeout(r, 1000));
+                  continue;
                 }
+                const body = await res.json();
+                // `events` is a label -> payload map; a null value still means the
+                // item was clicked (the registry only records the label).
+                const events = body?.events;
+                if (events && typeof events === 'object') {
+                  for (const label of Object.keys(events)) {
+                    if (label === '变成蓝色青年形态') {
+                      void transformToBlue(ctx);
+                    }
+                  }
+                }
+              } catch {
+                // dsh-pet went away; back off briefly, keep waiting.
+                await new Promise((r) => setTimeout(r, 2000));
               }
-            } catch {
-              // dsh-pet went away; keep polling quietly in case it returns.
             }
           };
-          const handle = ctx.timer.interval(poll, 1500);
+          void poll();
           return () => {
             stopped = true;
-            if (typeof handle === 'function') handle();
-            else if (handle?.dispose) handle.dispose();
             // Best effort: leave no stale menu entry behind.
             void fetch(`${base}/menu/item?owner=dsh-nexus`, { method: 'DELETE' }).catch(() => {});
           };

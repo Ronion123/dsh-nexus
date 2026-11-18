@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.2
+
+- Fix the form-change menu doing nothing. Two independent bugs:
+  1. The pet routes were built from a guessed port (`DSH_WEB_PORT`, else
+     `127.0.0.1:3000`). The Host binds a fresh random port each launch, so every
+     request failed and the item silently did nothing. The origin now comes from
+     `ctx.webServer.getOrigin()`.
+  2. The menu payload used `items: [{ label }]`; dsh-pet's contract is
+     `{ owner, labels: string[], target? }`. The registration was rejected with
+     `invalid-labels`, so 更多 never showed the item. A rejection is now logged.
+- The click listener holds `/menu/events?wait=10000` open instead of polling on a
+  fixed interval, so a click that lands between polls is not missed.
+
 ## 1.4.1
 
 - Fix the blue form's assets being unreachable. dsh-pet resolves clips as

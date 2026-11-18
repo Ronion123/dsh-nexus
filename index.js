@@ -408,6 +408,143 @@ function parseJsonc(text) {
 
 export const inject = [];
 
+/* ------------------------------------------------------------------------- *
+ * One-way form change: red youth -> blue youth.
+ *
+ * dsh-pet derives a pet's asset root from its config FILE NAME, so one instance
+ * cannot swap art sets at runtime. The two forms are therefore two pets, and the
+ * switch is a timed hand-off between them:
+ *
+ *   1. play the red form's shift clip,
+ *   2. wait for it to FINISH on the rendering side (/playback?wait=ended),
+ *   3. hide red and show blue at the same spot, in that order and in one tick.
+ *
+ * Step 3 is what keeps the motion continuous: the blue pet appears only after the
+ * transformation animation has run to its end, so the user sees "the shift plays,
+ * and blue is standing where red was" rather than a cross-fade or a double pet.
+ *
+ * The hand-off is one-way by construction: nothing ever shows red again, and the
+ * blue pack ships no form-shift clip. A user who wants red back reselects it in
+ * Settings, which we do not intercept.
+ * ------------------------------------------------------------------------- */
+
+/** Clips and pets that describe this transition. */
+const FORM = {
+  redPet: 'nexus',
+  bluePet: 'nexus-blue',
+  shiftClip: '形态切换',
+  // Margin after the clip ends: lets the last frame settle before the swap so the
+  // blue idle does not appear to start mid-motion.
+  settleMs: 60,
+};
+
+/** In-flight switch, so a double click cannot start two hand-offs. */
+let switching = false;
+
+/** dsh-pet's HTTP surface is per-install; discover the origin once. */
+async function petsBaseUrl() {
+  // The web GUI and the pet routes share one origin; the Host knows its own port.
+  const port = process.env.DSH_WEB_PORT ?? '';
+  if (port) return `http://127.0.0.1:${port}/dsh-pet-7340`;
+  return 'http://127.0.0.1:3000/dsh-pet-7340';
+}
+
+/** Read the merged config so we can see what is currently displayed. */
+async function readConfig(base) {
+  const res = await fetch(`${base}/config`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`config ${res.status}`);
+  return res.json();
+}
+
+/** Which of the two pets is visible right now, according to the config. */
+function visibleForm(cfg) {
+  const shown = (entry, id) => {
+    const pets = cfg?.[entry]?.pets;
+    if (!Array.isArray(pets)) return false;
+    const p = pets.find((x) => x && x.id === id);
+    return Boolean(p) && p.display !== 'none';
+  };
+  if (shown('nexus-blue', FORM.bluePet)) return 'blue';
+  if (shown('nexus', FORM.redPet)) return 'red';
+  return 'none';
+}
+
+/** Play a clip on one pet and resolve when the renderer reports it ended. */
+async function playAndWait(base, petId, clip) {
+  const started = await fetch(`${base}/anim?pet=${encodeURIComponent(petId)}&surface=any`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ name: clip }),
+  });
+  if (!started.ok) throw new Error(`anim ${started.status}`);
+  const body = await started.json();
+  if (!body?.ok || !body.playbackId) throw new Error(body?.reason ?? 'anim rejected');
+
+  // `wait=ended` blocks until the renderer reports the cue finished, so the swap
+  // happens after the animation rather than on a guessed timer.
+  //
+  // dsh-pet requires `wait` and `timeout` together, and caps the timeout at
+  // 10000ms (a larger value is answered with bad-request, which would look like an
+  // instant finish and swap mid-animation). Ask for the maximum and treat a
+  // timeout reply as "not finished" rather than as success.
+  const done = await fetch(
+    `${base}/playback/${encodeURIComponent(body.playbackId)}?wait=ended&timeout=10000`,
+    { cache: 'no-store' },
+  );
+  if (!done.ok) throw new Error(`playback ${done.status}`);
+  const settled = await done.json();
+  const status = settled?.playback?.status ?? settled?.status;
+  if (status !== 'ended') {
+    throw new Error(`shift clip not finished (status ${status ?? 'unknown'})`);
+  }
+  return body.playbackId;
+}
+
+/** Show one form and hide the other, writing both before either is rendered. */
+async function setForm(base, form) {
+  const show = form === 'blue' ? FORM.bluePet : FORM.redPet;
+  const hide = form === 'blue' ? FORM.redPet : FORM.bluePet;
+  // Order matters: reveal first, then hide, so a failed second call still leaves
+  // exactly one pet visible instead of none.
+  for (const [petId, display] of [[show, 'both'], [hide, 'none']]) {
+    const res = await fetch(`${base}/pet-display`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      // dsh-pet's body takes `id` (the pet instance), not `pet`.
+      body: JSON.stringify({ id: petId, display }),
+    });
+    if (!res.ok) throw new Error(`pet-display ${petId} ${res.status}`);
+    const out = await res.json();
+    if (out?.ok === false) throw new Error(out.reason ?? 'pet-display rejected');
+  }
+}
+
+/**
+ * Perform the one-way red -> blue transformation.
+ *
+ * @returns {Promise<{ok: boolean, reason?: string, from?: string}>}
+ */
+async function transformToBlue() {
+  if (switching) return { ok: false, reason: 'already-switching' };
+  switching = true;
+  try {
+    const base = await petsBaseUrl();
+    const cfg = await readConfig(base);
+    const current = visibleForm(cfg);
+    if (current === 'blue') return { ok: false, reason: 'already-blue' };
+    if (current !== 'red') return { ok: false, reason: 'red-not-visible' };
+
+    await playAndWait(base, FORM.redPet, FORM.shiftClip);
+    await new Promise((r) => setTimeout(r, FORM.settleMs));
+    await setForm(base, 'blue');
+    return { ok: true, from: 'red' };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+  } finally {
+    switching = false;
+  }
+}
+
 /**
  * Apply every one-shot effect. Safe to call repeatedly: each step compares content
  * hashes and skips work that is already applied.
@@ -447,6 +584,62 @@ function applyAll(ctx) {
 
 export function apply(ctx) {
   applyAll(ctx);
+
+  // Register the one-way form change in dsh-pet's third-party context menu.
+  // dsh-pet owns the menu; a plugin contributes items under its own owner name and
+  // learns about clicks by polling /menu/events with that same owner.
+  try {
+    if (ctx?.timer && typeof ctx.timer.interval === 'function') {
+      ctx.effect(() => {
+        let stopped = false;
+        void (async () => {
+          const base = await petsBaseUrl();
+          // The label is what the user clicks in 更多 -> dsh-nexus.
+          try {
+            await fetch(`${base}/menu/item`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json; charset=utf-8' },
+              body: JSON.stringify({
+                owner: 'dsh-nexus',
+                items: [{ label: '变成蓝色青年形态', target: 'both' }],
+              }),
+            });
+          } catch {
+            return; // dsh-pet absent: nothing to contribute to
+          }
+
+          const poll = async () => {
+            if (stopped) return;
+            try {
+              const res = await fetch(
+                `${base}/menu/events?owner=dsh-nexus&wait=0`,
+                { cache: 'no-store' },
+              );
+              if (res.ok) {
+                const body = await res.json();
+                for (const event of body?.events ?? []) {
+                  if (event?.label === '变成蓝色青年形态') void transformToBlue();
+                }
+              }
+            } catch {
+              // dsh-pet went away; keep polling quietly in case it returns.
+            }
+          };
+          const handle = ctx.timer.interval(poll, 1500);
+          return () => {
+            stopped = true;
+            if (typeof handle === 'function') handle();
+            else if (handle?.dispose) handle.dispose();
+            // Best effort: leave no stale menu entry behind.
+            void fetch(`${base}/menu/item?owner=dsh-nexus`, { method: 'DELETE' }).catch(() => {});
+          };
+        })();
+        return () => { stopped = true; };
+      }, 'dsh-nexus: form change menu');
+    }
+  } catch {
+    // Older Host without a timer service: the menu entry is simply not offered.
+  }
 
   // Installing or updating this bundle reconciles the profile without restarting
   // the process, so a plugin activated that way can mount long after boot — and may

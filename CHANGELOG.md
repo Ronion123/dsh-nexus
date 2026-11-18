@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.0
+
+- Add the Blue Youth form as a second pet pack (`nexus-blue`): five poses
+  (standing, battle, beam, beam-arrow, flight), a 9-frame idle loop, and nine
+  action clips — 36 clips and 5 stickers in total.
+- One-way transformation red -> blue, exposed as a third-party menu item
+  (更多 -> dsh-nexus -> 变成蓝色青年形态). The switch plays the red form's
+  `形态切换` clip and waits for `/playback?wait=ended` to report it finished
+  before hiding red and showing blue, so the transformation runs to its end and
+  blue appears standing where red was. No cross-fade, no two pets at once.
+  `wait` is capped at 10000ms by dsh-pet and must be paired with `timeout`;
+  the maximum is requested and a non-`ended` reply is treated as failure, so a
+  rejected request can never be mistaken for an instant finish.
+- The blue pack deliberately ships no form-shift clip: the change is
+  one-directional, matching the source material.
+- `tools/validate_pack.py` now validates every `*-config.json` in the pack
+  rather than a single red config, and reports orphan assets across both.
+
 ## 1.3.1
 
 - Fix the bundle patch: `name` was the bare `dsh-nexus` while the package is

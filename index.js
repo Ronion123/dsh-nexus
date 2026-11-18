@@ -98,8 +98,6 @@ function listClips(dir) {
 function installPetPack() {
   const userRoot = join(resolveDshHome(), 'dsh-pet');
   const petDir = join(userRoot, 'pet');
-  const animDir = join(petDir, 'nexus-animation');
-  const memeDir = join(petDir, 'nexus-memes');
   const markerPath = join(petDir, MARKER_NAME);
 
   let previous;
@@ -112,18 +110,34 @@ function installPetPack() {
   const summary = { ok: true, written: 0, unchanged: 0, removed: 0, root: userRoot };
   try {
     mkdirSync(petDir, { recursive: true });
-    mkdirSync(animDir, { recursive: true });
-    mkdirSync(memeDir, { recursive: true });
 
+    // Assets are grouped per asset root, and the root is the config FILE PREFIX:
+    // `/thumb/<root>/<clip>` only searches `pet/<root>-animation/`, never a shared
+    // directory. The blue form therefore needs its own `-animation` and `-memes`
+    // directories, or its clips 404 while the configs still look valid.
     installTree(join(PACK_DATA_DIR, 'config'), petDir, summary);
-    installTree(join(PACK_DATA_DIR, 'animation'), animDir, summary);
-    installTree(join(PACK_DATA_DIR, 'memes'), memeDir, summary);
+    for (const [srcDir, destDir] of [
+      ['animation', 'nexus-animation'],
+      ['memes', 'nexus-memes'],
+      ['blue-animation', 'nexus-blue-animation'],
+      ['blue-memes', 'nexus-blue-memes'],
+    ]) {
+      const dest = join(petDir, destDir);
+      mkdirSync(dest, { recursive: true });
+      installTree(join(PACK_DATA_DIR, srcDir), dest, summary);
+    }
 
+    const animDir = join(petDir, 'nexus-animation');
     const clips = listClips(animDir);
     summary.removed = removeStaleClips(animDir, previous, clips);
 
     // No timestamp: a byte-stable marker keeps repeated boots fully idempotent.
-    const marker = JSON.stringify({ version: BUNDLE_VERSION, bundle: 'dsh-nexus', clips }, null, 2) + '\n';
+    const marker = JSON.stringify({
+      version: BUNDLE_VERSION,
+      bundle: 'dsh-nexus',
+      clips,
+      blueClips: listClips(join(petDir, 'nexus-blue-animation')),
+    }, null, 2) + '\n';
     if (!existsSync(markerPath) || readFileSync(markerPath, 'utf8') !== marker) {
       writeFileSync(markerPath, marker);
       summary.written += 1;

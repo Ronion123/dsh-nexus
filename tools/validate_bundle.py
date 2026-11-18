@@ -98,8 +98,18 @@ for rel in ["index.js", "cordis.patch.yml", "icon.svg", "locale/en.json",
         errors.append("missing file " + rel)
 
 PACK = os.path.join(B, "pet-pack")
-n_webm = len([f for f in os.listdir(os.path.join(PACK, "animation")) if f.endswith(".webm")])
-n_png = len([f for f in os.listdir(os.path.join(PACK, "memes")) if f.endswith(".png")])
+# Assets live under one source directory per asset root (each form needs its own
+# `<root>-animation/` on disk, so the bundle mirrors that layout).
+n_webm = sum(
+    len([f for f in os.listdir(os.path.join(PACK, d)) if f.endswith(".webm")])
+    for d in ("animation", "blue-animation")
+    if os.path.isdir(os.path.join(PACK, d))
+)
+n_png = sum(
+    len([f for f in os.listdir(os.path.join(PACK, d)) if f.endswith(".png")])
+    for d in ("memes", "blue-memes")
+    if os.path.isdir(os.path.join(PACK, d))
+)
 print("pet-pack: %d webm, %d memes, avatar=%s, character=%s" % (
     n_webm, n_png,
     os.path.isfile(os.path.join(PACK, "config", "nexus-avatar.png")),

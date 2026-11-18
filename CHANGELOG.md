@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1
+
+- Fix the blue form's assets being unreachable. dsh-pet resolves clips as
+  `pet/<asset-root>-animation/<clip>.webm`, where the asset root is the config
+  file prefix — it never searches a shared directory. 1.4.0 installed every
+  clip into `nexus-animation/`, so all 36 blue clips answered 404 while the
+  configs still validated. The installer now writes per-root directories
+  (`nexus-*` and `nexus-blue-*`) and the bundle's own layout mirrors that.
+
 ## 1.4.0
 
 - Add the Blue Youth form as a second pet pack (`nexus-blue`): five poses

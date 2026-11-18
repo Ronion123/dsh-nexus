@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Validate every pet pack config in pet-pack/config against dsh-pet's rules.
+Validate every pet pack config against dsh-pet's rules.
 
-Each file is an independent "kind" (a config file prefix = an asset root), so the
-checks run per file and assets are unioned across all of them: one animation
-library serves both forms, and each form's config only references its own names.
+dsh-pet resolves assets per ASSET ROOT, which is the config file's name prefix:
+
+    pet/<root>-config.json      the kind definition
+    pet/<root>-animation/       clips  (no fallback to a shared directory)
+    pet/<root>-memes/           stickers
+
+The bundle therefore ships one source directory per root. This script derives that
+mapping from the config names, so adding a form needs no change here.
 """
 import json
 import os
@@ -16,21 +21,21 @@ sys.stdout.reconfigure(encoding="utf-8")
 BUNDLE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PACK = os.path.join(BUNDLE, "pet-pack")
 CFG_DIR = os.path.join(PACK, "config")
-ANIM = os.path.join(PACK, "animation")
-MEMES = os.path.join(PACK, "memes")
 
 CONFIGS = sorted(
     f for f in os.listdir(CFG_DIR)
     if re.match(r"^.+?-config\.json$", f) and not f.startswith(".")
 )
 
-errors = []
-on_disk = set(f[:-5] for f in os.listdir(ANIM) if f.endswith(".webm"))
-memes_on_disk = set(f[:-4] for f in os.listdir(MEMES) if f.endswith(".png"))
-all_referenced = set()
+# Asset root -> source directory inside the bundle.
+# `nexus` / `nexus-blue` ship as `animation`/`memes` and `blue-animation`/`blue-memes`
+# for readability, so record the mapping explicitly instead of guessing.
+SOURCE_DIRS = {
+    "nexus": ("animation", "memes"),
+    "nexus-blue": ("blue-animation", "blue-memes"),
+}
 
-print("configs:", CONFIGS)
-print("clips on disk:", len(on_disk), "| memes on disk:", len(memes_on_disk))
+errors = []
 
 
 def animations_valid(a):
@@ -93,10 +98,32 @@ def collect_names(a):
     return names
 
 
+print("configs:", CONFIGS)
+all_clips = set()
+all_memes = set()
+
 for cfg_name in CONFIGS:
+    root = cfg_name[: -len("-config.json")]
     path = os.path.join(CFG_DIR, cfg_name)
     cfg = json.load(open(path, encoding="utf-8"))
-    print("\n--- %s ---" % cfg_name)
+    print("\n--- %s  (asset root: %s) ---" % (cfg_name, root))
+
+    if root not in SOURCE_DIRS:
+        errors.append("%s: no source dir mapping for root %r" % (cfg_name, root))
+        continue
+    anim_src, meme_src = (os.path.join(PACK, d) for d in SOURCE_DIRS[root])
+    if not os.path.isdir(anim_src):
+        errors.append("%s: clip dir missing %s" % (cfg_name, SOURCE_DIRS[root][0]))
+        continue
+    if not os.path.isdir(meme_src):
+        errors.append("%s: meme dir missing %s" % (cfg_name, SOURCE_DIRS[root][1]))
+        continue
+
+    clips = set(f[:-5] for f in os.listdir(anim_src) if f.endswith(".webm"))
+    memes = set(f[:-4] for f in os.listdir(meme_src) if f.endswith(".png"))
+    all_clips |= clips
+    all_memes |= memes
+    print("  available clips: %d | stickers: %d" % (len(clips), len(memes)))
 
     a = cfg.get("animations")
     if not isinstance(a, dict):
@@ -112,8 +139,7 @@ for cfg_name in CONFIGS:
         errors.append("%s: animationWeights invalid" % cfg_name)
 
     names = collect_names(a)
-    all_referenced.update(names)
-    missing = [n for n in names if n not in on_disk]
+    missing = [n for n in names if n not in clips]
     if missing:
         errors.append("%s: missing clips %s" % (cfg_name, missing))
     print("  clips referenced: %d | missing: %s" % (len(names), missing or "none"))
@@ -123,14 +149,14 @@ for cfg_name in CONFIGS:
     if total != 100:
         errors.append("%s: weight total %s != 100" % (cfg_name, total))
 
-    memes = cfg.get("memes")
-    if not isinstance(memes, dict) or not memes:
+    pool = cfg.get("memes")
+    if not isinstance(pool, dict) or not pool:
         errors.append("%s: memes missing" % cfg_name)
     else:
-        for key in memes:
-            if key not in memes_on_disk:
-                errors.append("%s: meme file missing %s.png" % (cfg_name, key))
-        print("  memes: %d" % len(memes))
+        absent = [k for k in pool if k not in memes]
+        if absent:
+            errors.append("%s: meme files missing %s" % (cfg_name, absent))
+        print("  memes: %d | missing: %s" % (len(pool), absent or "none"))
 
     pets = cfg.get("pets")
     if not isinstance(pets, list) or not pets:
@@ -143,17 +169,6 @@ for cfg_name in CONFIGS:
                 errors.append("%s: empty pet id" % cfg_name)
         print("  pets: %s" % ", ".join("%s(%s)" % (p.get("id"), p.get("display")) for p in pets))
 
-# Assets no config mentions are dead weight but not fatal; report them once.
-orphans = sorted(on_disk - all_referenced)
-if orphans:
-    print("\nunreferenced clips (%d): %s" % (len(orphans), ", ".join(orphans[:8]) + ("..." if len(orphans) > 8 else "")))
-
-orphan_memes = sorted(memes_on_disk - set().union(*[
-    set(json.load(open(os.path.join(CFG_DIR, c), encoding="utf-8")).get("memes", {}))
-    for c in CONFIGS
-]))
-if orphan_memes:
-    print("unreferenced memes (%d): %s" % (len(orphan_memes), ", ".join(orphan_memes)))
-
+print("\ntotal clips across pack: %d | stickers: %d" % (len(all_clips), len(all_memes)))
 print("\nERRORS:", errors if errors else "NONE - all pack configs are valid")
 sys.exit(1 if errors else 0)

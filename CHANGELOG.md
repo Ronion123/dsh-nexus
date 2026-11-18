@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.4
+
+- Fix red and blue both staying on the desktop after a switch.
+  `visibleForm()` compared `display !== 'none'` but inspected the blue form
+  FIRST, so once both entries were visible it reported `blue` and the switch
+  returned `already-blue` without hiding red — the state could never repair
+  itself. It now reports `both` explicitly, and `transformToBlue` treats that
+  as a repairable state: it hides red immediately without replaying the shift
+  animation, because the user already sees blue.
+- The visible form is written as `both` instead of inheriting the surface it
+  had: a user who picked "desktop only" in Settings would otherwise lose the
+  pet from the web page on every switch.
+- `setForm` re-reads the config afterwards and throws when the result is not
+  exactly one form, so a partial write surfaces as an error instead of two
+  pets on screen.
+
 ## 1.4.3
 
 - Make the form-change item respond within about a second. Measured against

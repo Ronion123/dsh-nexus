@@ -482,16 +482,30 @@ async function readConfig(base) {
   return res.json();
 }
 
-/** Which of the two pets is visible right now, according to the config. */
+/**
+ * Which form is showing, judged from the config.
+ *
+ * `display` has four values and three of them are "visible on some surface":
+ * web, desktop, both. Only `none` is hidden. A form counts as showing if ANY of
+ * its surfaces is visible, and the caller must not assume the value is `both` —
+ * a user who picked "desktop only" in Settings has `desktop`, and treating that
+ * as hidden would make the switch run when it should not.
+ *
+ * Returns 'red', 'blue', 'both' (two forms on screen at once — the bug state this
+ * function must be able to name so the caller can repair it), or 'none'.
+ */
 function visibleForm(cfg) {
-  const shown = (entry, id) => {
+  const displayOf = (entry, id) => {
     const pets = cfg?.[entry]?.pets;
-    if (!Array.isArray(pets)) return false;
+    if (!Array.isArray(pets)) return 'none';
     const p = pets.find((x) => x && x.id === id);
-    return Boolean(p) && p.display !== 'none';
+    return p ? String(p.display ?? 'none') : 'none';
   };
-  if (shown('nexus-blue', FORM.bluePet)) return 'blue';
-  if (shown('nexus', FORM.redPet)) return 'red';
+  const red = displayOf('nexus', FORM.redPet) !== 'none';
+  const blue = displayOf('nexus-blue', FORM.bluePet) !== 'none';
+  if (red && blue) return 'both';
+  if (blue) return 'blue';
+  if (red) return 'red';
   return 'none';
 }
 
@@ -526,12 +540,20 @@ async function playAndWait(base, petId, clip) {
   return body.playbackId;
 }
 
-/** Show one form and hide the other, writing both before either is rendered. */
+/**
+ * Show one form and hide the other.
+ *
+ * The visible form is always set to `both` rather than inheriting whatever
+ * surface it had: a user who chose "desktop only" in Settings would otherwise
+ * lose the pet from the web page during a switch. Hiding always writes `none`.
+ *
+ * Reveal-then-hide order is kept so a failed second call still leaves one pet
+ * visible instead of none, but the caller verifies the end state afterwards —
+ * a partial write is exactly the "both forms on screen" bug.
+ */
 async function setForm(base, form) {
   const show = form === 'blue' ? FORM.bluePet : FORM.redPet;
   const hide = form === 'blue' ? FORM.redPet : FORM.bluePet;
-  // Order matters: reveal first, then hide, so a failed second call still leaves
-  // exactly one pet visible instead of none.
   for (const [petId, display] of [[show, 'both'], [hide, 'none']]) {
     const res = await fetch(`${base}/pet-display`, {
       method: 'POST',
@@ -543,12 +565,23 @@ async function setForm(base, form) {
     const out = await res.json();
     if (out?.ok === false) throw new Error(out.reason ?? 'pet-display rejected');
   }
+
+  // Verify: exactly one form must be visible. A silent partial write is the bug
+  // this check exists to surface instead of leaving two pets on the desktop.
+  const after = visibleForm(await readConfig(base));
+  if (after !== form) {
+    throw new Error(`switch incomplete (expected ${form}, got ${after})`);
+  }
 }
 
 /**
  * Perform the one-way red -> blue transformation.
  *
- * @returns {Promise<{ok: boolean, reason?: string, from?: string}>}
+ * Also repairs the "both visible" state: if a previous switch left both forms
+ * showing, hiding red alone is enough and no animation is needed, because the
+ * user already sees blue.
+ *
+ * @returns {Promise<{ok: boolean, reason?: string, from?: string, repaired?: boolean}>}
  */
 async function transformToBlue(ctx) {
   if (switching) return { ok: false, reason: 'already-switching' };
@@ -557,7 +590,15 @@ async function transformToBlue(ctx) {
     const base = await petsBaseUrl(ctx);
     const cfg = await readConfig(base);
     const current = visibleForm(cfg);
+
     if (current === 'blue') return { ok: false, reason: 'already-blue' };
+
+    // Both on screen: a previous run took red down only partway. Finish the job.
+    if (current === 'both') {
+      await setForm(base, 'blue');
+      return { ok: true, from: 'both', repaired: true };
+    }
+
     if (current !== 'red') return { ok: false, reason: 'red-not-visible' };
 
     await playAndWait(base, FORM.redPet, FORM.shiftClip);

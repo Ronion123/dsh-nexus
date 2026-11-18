@@ -14,7 +14,7 @@
 2. 出现 **发现** 标签 → **添加索引源**，粘贴：
 
    ```
-   https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.4.3/site/index.json
+   https://raw.githubusercontent.com/Ronion123/dsh-nexus/v1.4.4/site/index.json
    ```
 
 3. 找到「奈克赛斯桌宠」→ **安装** → 确认来源 `@roninxr/dsh-nexus@1.0.0`

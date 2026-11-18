@@ -1,6 +1,6 @@
 {
   "name": "@roninxr/dsh-nexus",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "奈克赛斯桌宠：红色与蓝色青年形态两套素材，支持单向形态转换，由 Q 版循环动画、九格动作组与透明姿势立绘组成的 dsh-pet 种类包。",
   "type": "module",
   "icon": "icon.svg",

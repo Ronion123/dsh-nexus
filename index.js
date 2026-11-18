@@ -615,7 +615,10 @@ export function apply(ctx) {
   // dsh-pet owns the menu; a plugin contributes items under its own owner name and
   // learns about clicks by polling /menu/events with that same owner.
   try {
-    if (ctx?.timer && typeof ctx.timer.interval === 'function') {
+    // No timer service is required: the click listener is a self-driving async
+    // loop that holds one long-poll open at a time, so the only dependencies are
+    // `webServer.getOrigin` and `effect`.
+    if (ctx && typeof ctx.effect === 'function') {
       ctx.effect(() => {
         let stopped = false;
         void (async () => {
@@ -635,46 +638,68 @@ export function apply(ctx) {
             return;
           }
           // The label is what the user clicks in 更多 -> dsh-nexus.
-          try {
-            // dsh-pet's register payload is { owner, labels: string[], target? }.
-            // `labels` is a flat string array (not objects); sending anything else
-            // is answered with invalid-labels and the item never appears in 更多.
-            const reg = await fetch(`${base}/menu/item`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json; charset=utf-8' },
-              body: JSON.stringify({
-                owner: 'dsh-nexus',
-                labels: ['变成蓝色青年形态'],
-                target: 'both',
-              }),
-            });
-            const regBody = await reg.json().catch(() => ({}));
-            if (regBody?.ok === false) {
-              ctx?.logger?.warn?.(
-                `[dsh-nexus] menu item rejected: ${regBody.reason ?? 'unknown'}`,
-              );
-              return;
+          //
+          // dsh-pet's register payload is { owner, labels: string[], target? }.
+          // `labels` is a flat string array (not objects); sending anything else is
+          // answered with invalid-labels and the item never appears in 更多.
+          //
+          // The registration lives in dsh-pet's memory and disappears whenever that
+          // plugin reloads, so this is kept as a callable for the loop to re-run.
+          const registerItem = async () => {
+            try {
+              const reg = await fetch(`${base}/menu/item`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                body: JSON.stringify({
+                  owner: 'dsh-nexus',
+                  labels: ['变成蓝色青年形态'],
+                  target: 'both',
+                }),
+              });
+              const regBody = await reg.json().catch(() => ({}));
+              if (regBody?.ok === false) {
+                ctx?.logger?.warn?.(
+                  `[dsh-nexus] menu item rejected: ${regBody.reason ?? 'unknown'}`,
+                );
+                return false;
+              }
+              return true;
+            } catch {
+              return false; // dsh-pet absent: nothing to contribute to
             }
-          } catch {
-            return; // dsh-pet absent: nothing to contribute to
-          }
+          };
 
-          // dsh-pet delivers a click to whichever `/menu/events` request is parked.
-          // A short fixed interval misses clicks that land between two polls, so
-          // hold the request open instead: the server parks it and answers as soon
-          // as a click arrives (or after its own wait cap).
+          if (!(await registerItem())) return;
+
+          // dsh-pet's `/menu/events` does NOT wake on click: measured against 0.4.9,
+          // a parked `wait=10000` request sits the full ten seconds even while a
+          // click arrives (`delivered` stays false), and the queued label is only
+          // readable when the request finally returns. So the wait window IS the
+          // latency; keep it short so a click reaches the pet quickly, and drain
+          // with `wait=0` semantics as the loop turns.
+          const WAIT_MS = 1500;
+
           const poll = async () => {
             while (!stopped) {
               try {
                 const res = await fetch(
-                  `${base}/menu/events?owner=dsh-nexus&wait=10000`,
+                  `${base}/menu/events?owner=dsh-nexus&wait=${WAIT_MS}`,
                   { cache: 'no-store' },
                 );
-                if (!res.ok) {
-                  await new Promise((r) => setTimeout(r, 1000));
+                const body = await res.json().catch(() => ({}));
+                if (body?.reason === 'unknown-owner') {
+                  // Registration was lost (dsh-pet reloaded, or another tool cleared
+                  // it): restore it instead of spinning against a dead owner.
+                  for (let attempt = 0; attempt < 3 && !stopped; attempt += 1) {
+                    if (await registerItem()) break;
+                    await new Promise((r) => setTimeout(r, 300));
+                  }
                   continue;
                 }
-                const body = await res.json();
+                if (!res.ok) {
+                  await new Promise((r) => setTimeout(r, 800));
+                  continue;
+                }
                 // `events` is a label -> payload map; a null value still means the
                 // item was clicked (the registry only records the label).
                 const events = body?.events;
@@ -687,7 +712,7 @@ export function apply(ctx) {
                 }
               } catch {
                 // dsh-pet went away; back off briefly, keep waiting.
-                await new Promise((r) => setTimeout(r, 2000));
+                await new Promise((r) => setTimeout(r, 1500));
               }
             }
           };

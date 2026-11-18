@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.3
+
+- Make the form-change item respond within about a second. Measured against
+  dsh-pet 0.4.9, `/menu/events` does not wake when a click arrives: a parked
+  `wait=10000` request stays open the full ten seconds (`delivered` is always
+  false) and the queued label is only readable when the request finally
+  returns. So the wait window was the latency. It is now 1500ms, which lands a
+  click on the pet in ~1s instead of ~10s.
+- Re-register automatically when dsh-pet answers `unknown-owner`: the registry
+  is in-memory and disappears whenever dsh-pet reloads, and the old loop would
+  spin forever against a dead owner without ever restoring the item.
+
 ## 1.4.2
 
 - Fix the form-change menu doing nothing. Two independent bugs:
